@@ -1,4 +1,3 @@
-// app.js
 require('dotenv').config();
 
 const express = require('express');
@@ -7,11 +6,12 @@ const MongoStore = require('connect-mongo');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 
-const db = require('./databaseConnection'); // MySQL pool (mysql2/promise)
+const db = require('./databaseConnection');
 const saltRounds = 12;
 
 const db_utils = require('./database/db_utils');  // just for version check / debugging
 const db_user = require('./database/users');
+const progressDb = require('./database/progress');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -22,17 +22,15 @@ const mongodb_password = process.env.MONGODB_PASSWORD;
 const mongodb_session_secret = process.env.MONGODB_SESSION_SECRET;
 
 const node_session_secret = process.env.NODE_SESSION_SECRET;
-console.log('MONGO SESSION SECRET length =', mongodb_session_secret && mongodb_session_secret.length);
-console.log('NODE SESSION SECRET length =', node_session_secret && node_session_secret.length);
+console.log('MONGO_SESSION_SECRET =', JSON.stringify(process.env.MONGODB_SESSION_SECRET));
+console.log('MONGO_SESSION_SECRET length =', process.env.MONGODB_SESSION_SECRET?.length);
 /* ----------------------- END OF SECRET INFORMATION ----------------------*/
 
 // --------------------------- MIDDLEWARE ----------------------------------
 
-// Parse JSON bodies (UnityWebRequest will send JSON)
 app.use(express.json());
 
 // Allow Unity/WebGL (or your front-end host) to call the API
-// For development, you can set CLIENT_ORIGIN in .env or hard-code localhost.
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 
 app.use(cors({
@@ -40,7 +38,6 @@ app.use(cors({
     credentials: true, // allow cookies
 }));
 
-// Sessions stored in MongoDB (encrypted)
 app.use(
     session({
         secret: node_session_secret,
@@ -48,7 +45,7 @@ app.use(
         saveUninitialized: false,
         store: MongoStore.create({
             mongoUrl: `mongodb+srv://${mongodb_user}:${mongodb_password}@gurvircluster.vjdfpla.mongodb.net/?retryWrites=true&w=majority&appName=GurvirCluster`,
-            // crypto: { secret: mongodb_session_secret }
+            // crypto: { secret: "gua6MZiDHdHqMLNVUbAr54ZxqTdMjqyBErs7Xc3b4v7NZ0dxwowPdgmyrufNYkP" }
         }),
         cookie: {
             httpOnly: true,
@@ -68,8 +65,10 @@ function isStrongPassword(pw) {
 
 function requireAuth(req, res, next) {
     if (!req.session.userId) {
+        console.log("Unauthorized Access!");
         return res.status(401).json({ message: 'Not authenticated' });
     }
+    console.log("Authorization Access Granted!");
     next();
 }
 
@@ -99,7 +98,7 @@ app.post('/api/auth/register', async (req, res) => {
             });
         }
 
-        // Check if user already exists
+        // Checks if user exists
         const existing = await db_user.getUser({ user: username });
         if (existing && existing.length > 0) {
             return res.status(409).json({ message: 'Username already taken' });
@@ -116,8 +115,9 @@ app.post('/api/auth/register', async (req, res) => {
             return res.status(500).json({ message: 'Error creating user' });
         }
 
-        // Create session
-        req.session.username = username;
+
+        const user_id = await db_user.getUserId({ user: username });
+        req.session.userId = user_id;
 
         res.status(201).json({
             username,
@@ -141,6 +141,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const user_db = await db_user.getUser({ user: username });
+        console.log(`user_db: ${user_db}`);
 
         if (!user_db || user_db.length !== 1) {
             console.log('User not found or duplicate rows');
@@ -150,6 +151,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
 
         const user = user_db[0]; // { username, password } where password is hashed
+        console.log(`user: ${user}`);
 
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
@@ -159,12 +161,59 @@ app.post('/api/auth/login', async (req, res) => {
                 .json({ message: 'Invalid username or password' });
         }
 
-        // Success -> set session
-        req.session.username = user.username;
+        
+        const user_id = await db_user.getUserId({ user: username });
+        console.log(`user_id: ${user_id}`);
+        req.session.userId = user_id;
 
         res.json({ username: user.username });
     } catch (err) {
         console.error('Login error:', err);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// GET /api/progress  -> return best score + wave it happened on
+app.get('/api/progress', requireAuth, async (req, res) => {
+    try {
+        const user_id = req.session.userId;
+
+        const row = await progressDb.getProgress(user_id); 
+        console.log('row is', row);
+
+        if (!row) {
+            // First time player
+            return res.json({
+                bestScore: 0,
+                bestWave: 1,
+            });
+        }
+
+        res.json({
+            bestScore: row.high_score,
+            bestWave: row.max_wave,
+        });
+    } catch (err) {
+        console.error('GET /api/progress error:', err);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+app.post('/api/progress', requireAuth, async (req, res) => {
+    try {
+        const user_id = req.session.userId;
+        const { wave, score } = req.body || {};
+
+        if (typeof wave !== 'number' || typeof score !== 'number') {
+            return res.status(400).json({ message: 'wave and score are required numbers' });
+        }
+
+        await progressDb.upsertProgress(user_id, wave, score);
+
+        console.log("Successful POST");
+        res.json({ ok: true });
+    } catch (err) {
+        console.error('POST /api/progress error:', err);
         res.status(500).json({ message: 'Internal server error' });
     }
 });

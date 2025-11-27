@@ -49,4 +49,29 @@ async function getUser(postData) {
     }
 }
 
-module.exports = { createUser, getUser };
+async function getUserId(postData) {
+    let getUserIdSQL = `
+        SELECT user_id
+        FROM user
+        WHERE username = :user;
+    `;
+
+    let params = {
+        user: postData.user
+    }
+
+    try {
+        const [rows] = await database.query(getUserIdSQL, params);
+
+        if (!rows || rows.length === 0) return null;
+
+        console.log("Successfully queried the database for user_id");
+        return rows[0].user_id;
+    } catch (err) {
+        console.log("Error trying to find user_id");
+        console.log(err);
+        return false;
+    }
+}
+
+module.exports = { createUser, getUser, getUserId };
