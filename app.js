@@ -57,7 +57,9 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-const isProduction = process.env.NODE_ENV === 'production';
+const isProduction =
+    process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
+
 
 app.use(
     session({
@@ -70,8 +72,8 @@ app.use(
         }),
         cookie: {
             httpOnly: true,
-            secure: isProduction,              // true on Render (https)
-            sameSite: isProduction ? 'none' : 'lax',   // allow cross-site cookie
+            secure: isProduction,                       // true on Render (https)
+            sameSite: isProduction ? 'none' : 'lax',    // allow cross-site cookie
         },
     })
 );
