@@ -7,9 +7,13 @@ const dbConfig = {
     password: process.env.MYSQL_PASSWORD,
     database: process.env.MYSQL_DATABASE,
     multipleStatements: false,
-    namedPlaceholders: true
+    namedPlaceholders: true,
+    ssl: {
+        ca: process.env.MYSQL_CA_CERT,
+        rejectUnauthorized: true
+    }
 };
 
-var database = mysql.createPool(dbConfig);
+const database = mysql.createPool(dbConfig);
 
 module.exports = database;
