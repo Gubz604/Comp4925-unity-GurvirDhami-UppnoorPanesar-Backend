@@ -30,13 +30,33 @@ console.log('MONGO_SESSION_SECRET length =', process.env.MONGODB_SESSION_SECRET?
 
 app.use(express.json());
 
-// Allow Unity/WebGL (or your front-end host) to call the API
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+// Allow Unity/WebGL (Netlify) + local dev to call the API
+const allowedOrigins = [
+    'http://localhost:5173',                      // local frontend (if you use it)
+    'http://localhost:3000',                      // local testing
+    'https://zesty-dolphin-b789bd.netlify.app',   // <-- your Netlify game URL
+    process.env.CLIENT_ORIGIN                     // optional extra from env
+];
 
 app.use(cors({
-    origin: CLIENT_ORIGIN,
-    credentials: true, // allow cookies
+    origin: function (origin, callback) {
+        // Allow non-browser tools / Unity editor / curl (no Origin header)
+        if (!origin) return callback(null, true);
+
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        console.log('CORS blocked:', origin);
+        return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
 }));
+
+// handle preflight nicely (optional but recommended)
+app.options('*', cors());
 
 app.use(
     session({
@@ -161,7 +181,7 @@ app.post('/api/auth/login', async (req, res) => {
                 .json({ message: 'Invalid username or password' });
         }
 
-        
+
         const user_id = await db_user.getUserId({ user: username });
         console.log(`user_id: ${user_id}`);
         req.session.userId = user_id;
@@ -178,7 +198,7 @@ app.get('/api/progress', requireAuth, async (req, res) => {
     try {
         const user_id = req.session.userId;
 
-        const row = await progressDb.getProgress(user_id); 
+        const row = await progressDb.getProgress(user_id);
         console.log('row is', row);
 
         if (!row) {
