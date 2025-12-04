@@ -55,6 +55,7 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+const isProduction = process.env.NODE_ENV === 'production';
 
 app.use(
     session({
@@ -67,8 +68,8 @@ app.use(
         }),
         cookie: {
             httpOnly: true,
-            secure: false,    // set to true when you deploy over HTTPS
-            sameSite: 'lax',  // for cross-site with HTTPS use 'none'
+            secure: isProduction,              // true on Render (https)
+            sameSite: isProduction ? 'none' : 'lax',   // allow cross-site cookie
         },
     })
 );
@@ -83,12 +84,13 @@ function isStrongPassword(pw) {
 
 function requireAuth(req, res, next) {
     if (!req.session.userId) {
-        console.log("Unauthorized Access!");
+        console.log("Unauthorized Access!", req.method, req.originalUrl, "cookies:", req.headers.cookie);
         return res.status(401).json({ message: 'Not authenticated' });
     }
-    console.log("Authorization Access Granted!");
+    console.log("Authorization Access Granted!", req.method, req.originalUrl, "userId:", req.session.userId);
     next();
 }
+
 
 // --------------------------- ROUTES --------------------------------------
 
