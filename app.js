@@ -16,6 +16,8 @@ const progressDb = require('./database/progress');
 const app = express();
 const port = process.env.PORT || 3000;
 
+app.set('trust proxy', 1);
+
 /* ----------------------- SECRET INFORMATION ----------------------------*/
 const mongodb_user = process.env.MONGODB_USER;
 const mongodb_password = process.env.MONGODB_PASSWORD;
