@@ -60,6 +60,8 @@ app.use(cors({
 const isProduction =
     process.env.NODE_ENV === 'production' || process.env.RENDER === 'true';
 
+console.log('isProduction =', isProduction, 'NODE_ENV =', process.env.NODE_ENV, 'RENDER =', process.env.RENDER);
+
 
 app.use(
     session({
