@@ -55,8 +55,6 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
-// handle preflight nicely (optional but recommended)
-app.options('*', cors());
 
 app.use(
     session({
