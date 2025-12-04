@@ -34,7 +34,7 @@ app.use(express.json());
 const allowedOrigins = [
     'http://localhost:5173',                      // local frontend (if you use it)
     'http://localhost:3000',                      // local testing
-    'https://zesty-dolphin-b789bd.netlify.app',   // <-- your Netlify game URL
+    'https://zesty-dolphin-b798bd.netlify.app',   // <-- your Netlify game URL
     process.env.CLIENT_ORIGIN                     // optional extra from env
 ];
 
